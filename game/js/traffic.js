@@ -7,7 +7,7 @@ import { CITY, blockLoop } from './city.js';
 import { makeCar, CAR_TYPES } from './vehicles.js';
 import { makePedestrian, animateWalk } from './people.js';
 
-const TRAFFIC_COLORS = ['sedan', 'sedan', 'sedan', 'van', 'van', 'truck', 'sport'];
+const TRAFFIC_COLORS = ['sedan', 'sedan', 'suv', 'van', 'truck', 'sport', 'lowrider'];
 
 export class TrafficManager {
   constructor(scene, colliders) {
@@ -42,6 +42,7 @@ export class TrafficManager {
       const colors = CAR_TYPES[type].colors;
       const car = makeCar(this.scene, type, colors[Math.floor(this.rng() * colors.length)], {
         x: p.x, z: p.z, heading: 0, driver: 'traffic',
+        ...(type === 'sport' && this.rng() < 0.3 ? { paint: 'camo' } : {}),
       });
       this.cars.push({
         car, loop, idx,
@@ -81,8 +82,8 @@ export class TrafficManager {
     const spots = [
       { x: 0, z: -92, type: 'sedan', heading: 0 },
       { x: 0, z: -108, type: 'sport', heading: Math.PI },
-      { x: -40, z: 150, type: 'van', heading: Math.PI / 2 },
-      { x: 60, z: 150, type: 'sedan', heading: Math.PI / 2 },
+      { x: -40, z: 150, type: 'suv', heading: Math.PI / 2 },
+      { x: 60, z: 150, type: 'lowrider', heading: Math.PI / 2 },
       { x: -60, z: -145, type: 'sport', heading: Math.PI / 2 },
       { x: 60, z: -145, type: 'sedan', heading: Math.PI / 2 },
       { x: 140, z: -60, type: 'taxi', heading: 0 },

@@ -267,6 +267,8 @@ export function buildCity(scene) {
 
   // Buildings, block by block.
   const roofMat = new THREE.MeshLambertMaterial({ color: 0x3a3f45 });
+  const doorMat = new THREE.MeshLambertMaterial({ color: 0x1a2028 });
+  const glassMat = new THREE.MeshLambertMaterial({ color: 0x24313e });
   let shopIdx = 0;
   for (const bx of CITY.blocks) {
     for (const bz of CITY.blocks) {
@@ -287,6 +289,21 @@ export function buildCity(scene) {
         mesh.receiveShadow = true;
         group.add(mesh);
         colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 });
+        // Parapet rim: breaks the flat roofline so the roof reads as a roof.
+        const parapet = new THREE.Mesh(new THREE.BoxGeometry(w + 0.6, 0.5, d + 0.6), roofMat);
+        parapet.position.set(x, h + 0.25, z);
+        group.add(parapet);
+        // Ground floor: a door + shopfront glass on the street-facing side,
+        // so facades stop reading as flat window grids at street level.
+        const fz = Math.abs(bz) >= Math.abs(bx) ? 1 : -1;
+        const door = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.6, 0.18), doorMat);
+        door.position.set(x, 1.3, z + fz * (d / 2 + 0.1));
+        group.add(door);
+        for (const s of [-2.8, 2.8]) {
+          const win = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2.2, 0.12), glassMat);
+          win.position.set(x + s, 1.2, z + fz * (d / 2 + 0.1));
+          group.add(win);
+        }
         if (h > 26) {
           // rooftop AC unit + antenna
           const ac = new THREE.Mesh(new THREE.BoxGeometry(3, 1.2, 2.4), roofMat);
@@ -594,13 +611,24 @@ export function buildCity(scene) {
   crowd.instanceMatrix.needsUpdate = true;
   if (crowd.instanceColor) crowd.instanceColor.needsUpdate = true;
   group.add(crowd);
-  // Pit lane boxes.
+  // Pit lane boxes: coloured doors + a roof stripe so they stop reading as
+  // flat dark slabs from the track.
   const pitMat = new THREE.MeshLambertMaterial({ color: 0x27435e });
+  const pitDoorColors = [0xc03028, 0x1f6fd2, 0xf2a007, 0x18b26b];
   for (let i = 0; i < 4; i++) {
     const pit = new THREE.Mesh(new THREE.BoxGeometry(8, 4, 6), pitMat);
     pit.position.set(CIRCUIT.cx - 30 + i * 20, 2, CIRCUIT.cz - CIRCUIT.b - 9);
     pit.castShadow = true;
     group.add(pit);
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.3, 6.2), new THREE.MeshLambertMaterial({ color: 0xe8e8e8 }));
+    stripe.position.set(pit.position.x, 4.15, pit.position.z);
+    group.add(stripe);
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(2, 2.6, 0.12),
+      new THREE.MeshLambertMaterial({ color: pitDoorColors[i] }),
+    );
+    door.position.set(pit.position.x, 1.3, pit.position.z + 3.06);
+    group.add(door);
     colliders.push({ minX: pit.position.x - 4, maxX: pit.position.x + 4, minZ: pit.position.z - 3, maxZ: pit.position.z + 3 });
   }
   // Connector road from the city to the circuit gate.
@@ -618,6 +646,50 @@ export function buildCity(scene) {
     bench.position.set(bx, 0.5, bz);
     bench.rotation.y = ry;
     group.add(bench);
+  }
+
+  // Street props on the sidewalks: hydrants, bins, bus stops.
+  const hydrantMat = new THREE.MeshLambertMaterial({ color: 0xc03028 });
+  const hydrantGeo = new THREE.CylinderGeometry(0.16, 0.18, 0.65, 8);
+  const hydrantCapGeo = new THREE.SphereGeometry(0.17, 8, 6);
+  for (const s of [-40, 40]) {
+    for (const p of [-80, 0, 80]) {
+      const hy = new THREE.Mesh(hydrantGeo, hydrantMat);
+      hy.position.set(s + 8.5, 0.33, p);
+      group.add(hy);
+      const cap = new THREE.Mesh(hydrantCapGeo, hydrantMat);
+      cap.position.set(s + 8.5, 0.7, p);
+      group.add(cap);
+    }
+  }
+  const binMat = new THREE.MeshLambertMaterial({ color: 0x2e4a3a });
+  const binGeo = new THREE.CylinderGeometry(0.32, 0.3, 0.85, 8);
+  const binLidGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.08, 8);
+  for (const s of [-80, 80]) {
+    for (const p of [-40, 40]) {
+      const bin = new THREE.Mesh(binGeo, binMat);
+      bin.position.set(s - 8.5, 0.43, p);
+      group.add(bin);
+      const lid = new THREE.Mesh(binLidGeo, binMat);
+      lid.position.set(s - 8.5, 0.9, p);
+      group.add(lid);
+    }
+  }
+  const busSignTex = signTexture('BUS', '#1a4a8a', '#ffffff');
+  for (const [sx, sz, ry] of [[48.5, -40, 0], [-48.5, 40, Math.PI]]) {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 3, 6), poleMat);
+    pole.position.set(sx, 1.5, sz);
+    group.add(pole);
+    const sign = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.3, 0.7),
+      new THREE.MeshLambertMaterial({ map: busSignTex, emissiveMap: busSignTex, emissive: new THREE.Color(0xffffff), emissiveIntensity: 0.3 }),
+    );
+    sign.position.set(sx, 2.8, sz);
+    sign.rotation.y = ry;
+    group.add(sign);
+    const stopBench = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.45, 0.7), benchMat);
+    stopBench.position.set(sx + (ry === 0 ? 1.4 : -1.4), 0.45, sz);
+    group.add(stopBench);
   }
 
   let seaPhase = 0;

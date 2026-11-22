@@ -33,8 +33,8 @@ class Game {
     this.jumpV = 0;
     this.camYaw = 0;
     this.camPitch = 0.20;
-    this.camDist = 5.5;
-    this.camDistTarget = 5.5;
+    this.camDist = 4.8;
+    this.camDistTarget = 4.8;
     this.time = 0;
   }
 
@@ -78,19 +78,20 @@ class Game {
       health: 100,
     };
 
-    // Mission marker beacon.
+    // Mission marker beacon — kept small and translucent so it never
+    // dominates the frame (it used to hide the race gantry banner).
     this.markerGroup = new THREE.Group();
-    const beamMat = new THREE.MeshBasicMaterial({ color: 0xffd94d, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 9, 16, 1, true), beamMat);
-    beam.position.y = 4.5;
+    const beamMat = new THREE.MeshBasicMaterial({ color: 0xffd94d, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 7, 16, 1, true), beamMat);
+    beam.position.y = 3.5;
     this.markerGroup.add(beam);
     const ringMat = new THREE.MeshBasicMaterial({ color: 0xffd94d, transparent: true, opacity: 0.7, side: THREE.DoubleSide });
-    const ring = new THREE.Mesh(new THREE.RingGeometry(1.4, 2.2, 24), ringMat);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.4, 24), ringMat);
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.1;
     this.markerGroup.add(ring);
     const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.55), new THREE.MeshBasicMaterial({ color: 0xffd94d }));
-    gem.position.y = 6;
+    gem.position.y = 5.2;
     this.markerGroup.add(gem);
     this.markerGem = gem;
     this.markerGroup.visible = false;
@@ -291,7 +292,7 @@ class Game {
     this.player.heading = car.heading;
     this.rico.group.visible = true;
     this.rico.group.position.set(this.player.x, 0, this.player.z);
-    this.camDistTarget = 5.5;
+    this.camDistTarget = 4.8;
     this.audio.click();
   }
 
@@ -552,7 +553,7 @@ class Game {
 
   _updateMarker(dt) {
     if (!this.markerPos) return;
-    this.markerGem.position.y = 6 + Math.sin(this.time * 2.4) * 0.5;
+    this.markerGem.position.y = 5.2 + Math.sin(this.time * 2.4) * 0.4;
     this.markerGem.rotation.y += dt * 2;
   }
 
