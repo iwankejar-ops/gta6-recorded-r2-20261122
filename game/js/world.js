@@ -2,7 +2,7 @@
 // (clear / overcast / rain) and rain particles.
 // GRAND CITY 6 — original code, written for this entry.
 
-import { clamp, lerp } from './util.js';
+import { clamp, lerp, canvasTexture } from './util.js';
 
 const DAY_SKY = new THREE.Color(0x87b5d9);
 const DUSK_SKY = new THREE.Color(0xe89a5a);
@@ -33,10 +33,12 @@ export class World {
     scene.add(this.sun);
     scene.add(this.sun.target);
 
-    this.hemi = new THREE.HemisphereLight(0xbfd9ff, 0x8a7a5a, 0.8);
+    // Hemisphere fill kept low so the sun's shadows actually read: a flat
+    // fill is what made the daylight shots look 2D.
+    this.hemi = new THREE.HemisphereLight(0xbfd9ff, 0x8a7a5a, 0.5);
     scene.add(this.hemi);
 
-    scene.fog = new THREE.Fog(0x87b5d9, 90, 460);
+    scene.fog = new THREE.Fog(0x87b5d9, 70, 380);
 
     // Stars (visible at night).
     const starGeo = new THREE.BufferGeometry();
@@ -69,6 +71,28 @@ export class World {
     this.rain.frustumCulled = false;
     scene.add(this.rain);
     this.rainVel = 30;
+
+    const cloudTex = canvasTexture(128, 128, (g) => {
+      const blob = (x, y, r, a) => {
+        const grad = g.createRadialGradient(x, y, 2, x, y, r);
+        grad.addColorStop(0, `rgba(255,255,255,${a})`);
+        grad.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = grad;
+        g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+      };
+      blob(64, 70, 46, 0.85);
+      blob(36, 76, 30, 0.7);
+      blob(94, 74, 32, 0.7);
+      blob(64, 52, 28, 0.6);
+    });
+    this.clouds = [];
+    for (let i = 0; i < 12; i++) {
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0.5 + Math.random() * 0.3, depthWrite: false }));
+      spr.position.set(-220 + Math.random() * 640, 60 + Math.random() * 25, -220 + Math.random() * 480);
+      spr.scale.set(55 + Math.random() * 55, 16 + Math.random() * 12, 1);
+      scene.add(spr);
+      this.clouds.push(spr);
+    }
 
     this._tmpColor = new THREE.Color();
   }
@@ -116,8 +140,8 @@ export class World {
     const lowSun = clamp(1 - Math.abs(elev) * 2.2, 0, 1);
     this.sun.color.setHex(0xfff2dd).lerp(new THREE.Color(0xff9a4d), lowSun * 0.8);
     const cloudDim = 1 - wb * 0.55;
-    this.sun.intensity = (0.2 + df * 1.7) * cloudDim;
-    this.hemi.intensity = 0.3 + df * 0.55;
+    this.sun.intensity = (0.15 + df * 2.2) * cloudDim;
+    this.hemi.intensity = 0.25 + df * 0.35;
 
     // Sky + fog.
     const sky = this._tmpColor.copy(NIGHT_SKY);
@@ -127,14 +151,20 @@ export class World {
     sky.lerp(OVERCAST_SKY, wb * 0.55);
     this.scene.background = sky;
     this.scene.fog.color.copy(sky);
-    const fogNear = lerp(90, 30, wb);
-    const fogFar = lerp(460, 170, wb);
+    const fogNear = lerp(70, 26, wb);
+    const fogFar = lerp(380, 150, wb);
     this.scene.fog.near = fogNear;
     this.scene.fog.far = fogFar;
 
     // Stars.
     this.starMat.opacity = this.nightFactor * 0.9;
     this.stars.position.set(px, 0, pz);
+
+    // Clouds drift slowly; wrap around the city bounds.
+    for (const c of this.clouds) {
+      c.position.x += dt * 0.7;
+      if (c.position.x > 430) c.position.x = -230;
+    }
 
     // Rain.
     const raining = wb > 0.55;

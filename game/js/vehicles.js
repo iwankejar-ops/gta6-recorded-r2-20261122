@@ -47,6 +47,21 @@ export function makeCar(scene, type, color, opts = {}) {
   body.position.y = bodyY;
   body.castShadow = true;
   group.add(body);
+  // Sloped hood + trunk deck: break the flat slab silhouette so the car
+  // reads as a car from a low chase camera instead of a plain box.
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(L * 0.3, 0.07, W * 0.92), bodyMat);
+  hood.position.set(L * 0.32, bodyY + bodyH / 2 + 0.03, 0);
+  hood.rotation.z = -0.1;
+  hood.castShadow = true;
+  group.add(hood);
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(L * 0.22, 0.07, W * 0.92), bodyMat);
+  deck.position.set(-L * 0.36, bodyY + bodyH / 2 + 0.03, 0);
+  deck.rotation.z = 0.07;
+  group.add(deck);
+  // Dark lower band: two-tone body, grounded stance.
+  const band = new THREE.Mesh(new THREE.BoxGeometry(L * 0.99, 0.14, W * 1.01), new THREE.MeshLambertMaterial({ color: 0x181818 }));
+  band.position.set(0, 0.16, 0);
+  group.add(band);
   // Cabin / glasshouse.
   const cabin = new THREE.Mesh(new THREE.BoxGeometry(L * 0.48, 0.5, W * 0.86), glassMat);
   cabin.position.set(-L * 0.06, bodyY + bodyH / 2 + 0.24, 0);
@@ -119,12 +134,16 @@ export function makeCar(scene, type, color, opts = {}) {
   }
 
   // Headlights + taillights.
-  const headGeo = new THREE.BoxGeometry(0.08, 0.14, 0.34);
+  const headGeo = new THREE.BoxGeometry(0.1, 0.18, 0.42);
   for (const s of [-0.62, 0.62]) {
     const hl = new THREE.Mesh(headGeo, headMat);
     hl.position.set(L / 2 + 0.01, bodyY + 0.08, s);
     group.add(hl);
   }
+  // Front grille bar between the headlights.
+  const grille = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.16, 0.9), new THREE.MeshLambertMaterial({ color: 0x0e0e0e }));
+  grille.position.set(L / 2 + 0.01, bodyY + 0.02, 0);
+  group.add(grille);
   const tailGeo = new THREE.BoxGeometry(0.08, 0.14, 0.4);
   const tailL = new THREE.Mesh(tailGeo, tailMat.clone());
   tailL.position.set(-L / 2 - 0.01, bodyY + 0.08, -0.55);
@@ -149,6 +168,15 @@ export function makeCar(scene, type, color, opts = {}) {
     pivot.add(hub);
     group.add(pivot);
     wheels.push({ pivot, wheel, front });
+  }
+
+  // Wheel-arch trim: dark rims above each wheel so the wheels sit in the body.
+  const archMat = new THREE.MeshLambertMaterial({ color: 0x181818 });
+  const archY = (cfg.low ? 0.42 : 0.36) + (cfg.low ? 0.42 : 0.36) + 0.02;
+  for (const [ax, s] of [[wx, -1], [wx, 1], [-wx, -1], [-wx, 1]]) {
+    const arch = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.18, 0.06), archMat);
+    arch.position.set(ax, archY, s * (W / 2 + 0.005));
+    group.add(arch);
   }
 
   // Fake headlight cones (visible at night).

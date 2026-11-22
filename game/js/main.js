@@ -32,9 +32,9 @@ class Game {
     this.jumpY = 0;
     this.jumpV = 0;
     this.camYaw = 0;
-    this.camPitch = 0.34;
-    this.camDist = 7;
-    this.camDistTarget = 7;
+    this.camPitch = 0.20;
+    this.camDist = 5.5;
+    this.camDistTarget = 5.5;
     this.time = 0;
   }
 
@@ -47,6 +47,10 @@ class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // Filmic tone mapping: deeper shadows and softer highlights so the 3D
+    // forms read instead of flat-shaded slabs.
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.15;
     document.getElementById('app').appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
@@ -265,7 +269,7 @@ class Game {
     this.player.x = car.group.position.x;
     this.player.z = car.group.position.z;
     this.player.heading = car.heading;
-    this.camDistTarget = 10;
+    this.camDistTarget = 8.5;
     this.audio.click();
     if (!force && this.police.wanted === 0) {
       // Stealing a car nobody owns is fine; stealing a traffic car is a crime.
@@ -287,7 +291,7 @@ class Game {
     this.player.heading = car.heading;
     this.rico.group.visible = true;
     this.rico.group.position.set(this.player.x, 0, this.player.z);
-    this.camDistTarget = 7;
+    this.camDistTarget = 5.5;
     this.audio.click();
   }
 

@@ -105,6 +105,22 @@ function roadTexture() {
   });
 }
 
+function groundTexture() {
+  return canvasTexture(256, 256, (g, w, h) => {
+    g.fillStyle = '#6f7f5e'; g.fillRect(0, 0, w, h);
+    // patchy lawn: soft darker / lighter blotches so the grass is not one flat green
+    for (let i = 0; i < 240; i++) {
+      const x = Math.random() * w, y = Math.random() * h, r = 4 + Math.random() * 22;
+      g.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)';
+      g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    }
+    for (let i = 0; i < 900; i++) {
+      g.fillStyle = 'rgba(0,0,0,0.05)';
+      g.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+    }
+  });
+}
+
 function checkeredTexture() {
   return canvasTexture(128, 32, (g, w, h) => {
     const s = 16;
@@ -185,7 +201,10 @@ export function buildCity(scene) {
   roadTex.wrapS = roadTex.wrapT = THREE.RepeatWrapping;
 
   // Ground: grass base + sand + sea handled below.
-  const groundMat = new THREE.MeshLambertMaterial({ color: 0x6f7f5e });
+  const groundTex = groundTexture();
+  groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
+  groundTex.repeat.set(7, 7);
+  const groundMat = new THREE.MeshLambertMaterial({ map: groundTex });
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(700, 700), groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(80, -0.05, 20);
@@ -210,9 +229,14 @@ export function buildCity(scene) {
     texH.needsUpdate = true;
     texH.repeat.set(1, rep);
     const matH = new THREE.MeshLambertMaterial({ map: texH });
-    const rh = new THREE.Mesh(new THREE.PlaneGeometry(260, CITY.roadWidth), matH);
-    rh.rotation.x = -Math.PI / 2;
-    rh.rotation.z = Math.PI / 2;
+    // East-west road: build it from the same geometry as the north-south
+    // road and rotate the GEOMETRY. The old mesh rotation.x + rotation.z
+    // mapped the texture across the road instead of along it, so the yellow
+    // centre line painted a solid yellow slab across the whole street.
+    const geoH = new THREE.PlaneGeometry(CITY.roadWidth, 260);
+    geoH.rotateX(-Math.PI / 2);
+    geoH.rotateY(Math.PI / 2);
+    const rh = new THREE.Mesh(geoH, matH);
     rh.position.set(0, 0.02, s);
     rh.receiveShadow = true;
     group.add(rh);
@@ -453,28 +477,93 @@ export function buildCity(scene) {
   const trackGeo = new THREE.ShapeGeometry(shape, 8);
   trackGeo.rotateX(-Math.PI / 2);
   const trackTex = canvasTexture(512, 512, (g, w, h) => {
+    // Plain asphalt + speckle only. The old red-white curbs and centre
+    // dashes were drawn in texture space, but ShapeGeometry stretches the
+    // texture over the track's bounding box, so they landed in the wrong
+    // places; curbs are now real geometry below.
     g.fillStyle = '#3a3d42'; g.fillRect(0, 0, w, h);
     g.fillStyle = 'rgba(255,255,255,0.05)';
     for (let i = 0; i < 300; i++) g.fillRect(Math.random() * w, Math.random() * h, 2, 2);
-    // red-white curbs along the edges
-    for (let x = 0; x < w; x += 32) {
-      g.fillStyle = (x / 32) % 2 === 0 ? '#c03028' : '#f0f0f0';
-      g.fillRect(x, 0, 32, 14); g.fillRect(x, h - 14, 32, 14);
-    }
-    g.fillStyle = '#e8e8e8';
-    for (let x = 0; x < w; x += 48) g.fillRect(x + 8, h / 2 - 3, 24, 6);
   });
   const trackMat = new THREE.MeshLambertMaterial({ map: trackTex });
   const track = new THREE.Mesh(trackGeo, trackMat);
   track.position.set(0, 0.04, 0);
   track.receiveShadow = true;
   group.add(track);
-  // Start / finish line on the south straight.
+  // Start / finish line on the south straight (3 along the track, 12 across it).
   const startTex = checkeredTexture();
-  const startLine = new THREE.Mesh(new THREE.PlaneGeometry(12, 3), new THREE.MeshLambertMaterial({ map: startTex }));
+  const startLine = new THREE.Mesh(new THREE.PlaneGeometry(3, 12), new THREE.MeshLambertMaterial({ map: startTex }));
   startLine.rotation.x = -Math.PI / 2;
   startLine.position.set(CIRCUIT.cx, 0.07, CIRCUIT.cz + CIRCUIT.b);
   group.add(startLine);
+  // Real red-white curbs along both track edges (instanced blocks following
+  // the loop, alternating colour) + low barriers outside the outer edge.
+  const curbDummy = new THREE.Object3D();
+  const curbGeo = new THREE.BoxGeometry(2.4, 0.32, 1.1);
+  const curbMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const edgeLoops = [
+    { a: CIRCUIT.a + CIRCUIT.width / 2 + 0.9, b: CIRCUIT.b + CIRCUIT.width / 2 + 0.9, r: CIRCUIT.r + CIRCUIT.width / 2 + 0.9 },
+    { a: CIRCUIT.a - CIRCUIT.width / 2 - 0.9, b: CIRCUIT.b - CIRCUIT.width / 2 - 0.9, r: CIRCUIT.r - CIRCUIT.width / 2 - 0.9 },
+  ];
+  const curbPts = [];
+  for (const e of edgeLoops) {
+    const pts = roundedRectPoints(CIRCUIT.cx, CIRCUIT.cz, e.a, e.b, e.r, 80);
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i], q = pts[(i + 1) % pts.length];
+      curbPts.push({ x: p.x, z: p.z, heading: Math.atan2(q.x - p.x, -(q.z - p.z)) });
+    }
+  }
+  const curbs = new THREE.InstancedMesh(curbGeo, curbMat, curbPts.length);
+  curbPts.forEach((c, i) => {
+    curbDummy.position.set(c.x, 0.16, c.z);
+    curbDummy.rotation.set(0, -c.heading, 0);
+    curbDummy.updateMatrix();
+    curbs.setMatrixAt(i, curbDummy.matrix);
+    curbs.setColorAt(i, new THREE.Color(i % 2 === 0 ? 0xc03028 : 0xf0f0f0));
+  });
+  curbs.instanceMatrix.needsUpdate = true;
+  if (curbs.instanceColor) curbs.instanceColor.needsUpdate = true;
+  curbs.receiveShadow = true;
+  group.add(curbs);
+  const barGeo = new THREE.BoxGeometry(2.6, 0.9, 0.5);
+  const barMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const barPtsAll = roundedRectPoints(CIRCUIT.cx, CIRCUIT.cz, CIRCUIT.a + CIRCUIT.width / 2 + 2.6, CIRCUIT.b + CIRCUIT.width / 2 + 2.6, CIRCUIT.r + CIRCUIT.width / 2 + 2.6, 72);
+  // Skip barrier blocks where they would clip the grandstands (south
+  // straight) or the pit boxes (north straight).
+  const barPts = barPtsAll.filter((p) => {
+    const southStand = Math.abs(p.z - (CIRCUIT.cz + CIRCUIT.b + CIRCUIT.width / 2 + 2.6)) < 1 && Math.abs(p.x - CIRCUIT.cx) < 54;
+    const northPits = Math.abs(p.z - (CIRCUIT.cz - CIRCUIT.b - CIRCUIT.width / 2 - 2.6)) < 1 && Math.abs(p.x - CIRCUIT.cx) < 40;
+    return !southStand && !northPits;
+  });
+  const bars = new THREE.InstancedMesh(barGeo, barMat, barPts.length);
+  barPts.forEach((p, i) => {
+    const q = barPts[(i + 1) % barPts.length];
+    curbDummy.position.set(p.x, 0.45, p.z);
+    curbDummy.rotation.set(0, -Math.atan2(q.x - p.x, -(q.z - p.z)), 0);
+    curbDummy.updateMatrix();
+    bars.setMatrixAt(i, curbDummy.matrix);
+    bars.setColorAt(i, new THREE.Color(i % 2 === 0 ? 0xc03028 : 0xf0f0f0));
+  });
+  bars.instanceMatrix.needsUpdate = true;
+  if (bars.instanceColor) bars.instanceColor.needsUpdate = true;
+  bars.castShadow = true;
+  group.add(bars);
+  // Start / finish gantry: two poles + a banner across the track.
+  const gantryMat = new THREE.MeshLambertMaterial({ color: 0x22262c });
+  for (const pz of [CIRCUIT.cz + CIRCUIT.b - 7.4, CIRCUIT.cz + CIRCUIT.b + 7.4]) {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 6.4, 8), gantryMat);
+    pole.position.set(CIRCUIT.cx, 3.2, pz);
+    pole.castShadow = true;
+    group.add(pole);
+  }
+  const bannerTex = signTexture('SOLMAR GRAND PRIX', '#10243e', '#ffd94d');
+  const banner = new THREE.Mesh(
+    new THREE.PlaneGeometry(15.6, 1.7),
+    new THREE.MeshLambertMaterial({ map: bannerTex, emissiveMap: bannerTex, emissive: new THREE.Color(0xffffff), emissiveIntensity: 0.3, side: THREE.DoubleSide }),
+  );
+  banner.rotation.y = -Math.PI / 2; // front face toward the west approach, text reads left-to-right
+  banner.position.set(CIRCUIT.cx, 5.9, CIRCUIT.cz + CIRCUIT.b);
+  group.add(banner);
   // Grandstands along the main straight + crowd.
   const standMat = new THREE.MeshLambertMaterial({ color: 0x5a6068 });
   for (let s = -1; s <= 1; s++) {

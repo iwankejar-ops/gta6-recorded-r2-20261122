@@ -45,18 +45,26 @@ export function makePerson(scene, opts = {}) {
 
   // Legs pivot at the hip (y 0.82).
   const legGeo = new THREE.BoxGeometry(0.2, 0.82, 0.24);
+  const shoeMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+  const shoeGeo = new THREE.BoxGeometry(0.22, 0.1, 0.36);
   const legL = new THREE.Group();
   legL.position.set(-0.13, 0.82, 0);
   const legLMesh = new THREE.Mesh(legGeo, pantsMat);
   legLMesh.position.y = -0.41;
   legLMesh.castShadow = true;
   legL.add(legLMesh);
+  const shoeL = new THREE.Mesh(shoeGeo, shoeMat);
+  shoeL.position.set(0, -0.78, -0.05);
+  legL.add(shoeL);
   const legR = new THREE.Group();
   legR.position.set(0.13, 0.82, 0);
   const legRMesh = new THREE.Mesh(legGeo, pantsMat);
   legRMesh.position.y = -0.41;
   legRMesh.castShadow = true;
   legR.add(legRMesh);
+  const shoeR = new THREE.Mesh(shoeGeo, shoeMat);
+  shoeR.position.set(0, -0.78, -0.05);
+  legR.add(shoeR);
   group.add(legL, legR);
 
   // Torso.
@@ -65,6 +73,15 @@ export function makePerson(scene, opts = {}) {
   torso.position.y = 0.82 + torsoH / 2;
   torso.castShadow = true;
   group.add(torso);
+  // Belt + shoulder pads: break the plain torso box.
+  const belt = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.09, 0.32), new THREE.MeshLambertMaterial({ color: 0x1a1a1a }));
+  belt.position.y = 0.86;
+  group.add(belt);
+  for (const s of [-1, 1]) {
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.1, 0.3), shirtMat);
+    pad.position.set(s * 0.3, 1.47, 0);
+    group.add(pad);
+  }
   // Rico's white tee under the open jacket: a pale chest stripe.
   if (isRico) {
     const tee = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.5, 0.04), new THREE.MeshLambertMaterial({ color: 0xf0ede4 }));
